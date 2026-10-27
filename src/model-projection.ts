@@ -1,22 +1,19 @@
 /**
- * `sessionModel` projection unit: the last model/provider that produced an
- * assistant message. The client snapshot's assistant nodes do not carry
+ * `sessionModel` projection unit: the model pair of the last committed model
+ * message. The client snapshot's assistant nodes do not carry
  * provenance, so the bar reads this projection instead of walking nodes.
  */
 
 import { z } from 'zod'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-
-/** Latest model identity plus when it was last seen. */
-export interface SessionModelState {
-  provider: string | null
-  model: string | null
-  updatedAt: number | null
-}
+import { modelIdentityFromSource, type SessionModelState } from './model-identity.ts'
+export type { SessionModelState } from './model-identity.ts'
 
 const sessionModelSchema = z.object({
   provider: z.string().nullable(),
-  model: z.string().nullable(),
+  requestedModel: z.string().nullable(),
+  responseModel: z.string().nullable(),
+  seq: z.number().nullable(),
   updatedAt: z.number().nullable(),
 }).strict()
 
@@ -34,15 +31,15 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
 export const sessionModelProjectionDefinition = {
   key: 'sessionModel',
   stateSchema: sessionModelSchema,
-  init: () => ({ provider: null, model: null, updatedAt: null }),
+  init: () => ({ provider: null, requestedModel: null, responseModel: null, seq: null, updatedAt: null }),
   apply: (state, event) => {
     if (event.type !== 'assistant/message') return state
-    const source = event.data.message.source
-    if (source.kind !== 'model') return state
-    const { provider, model } = source
-    if (provider === state.provider && model === state.model) return state
-    return { provider, model, updatedAt: event.time }
+    const identity = modelIdentityFromSource(event.data.message.source)
+    if (identity === null) return state
+    // Replace the whole pair even when the request is unchanged. A missing
+    // report on this message must clear the previous message's report.
+    return { ...identity, seq: event.seq, updatedAt: event.time }
   },
   wire: { viewSchema: sessionModelSchema, view: state => state },
-  stateVersion: 1,
+  stateVersion: 2,
 } satisfies ProjectionDefinition<'sessionModel', SessionModelState>

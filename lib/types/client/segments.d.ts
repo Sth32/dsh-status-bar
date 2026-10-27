@@ -10,6 +10,8 @@ import type { JobView } from '@deepseek-ai/dsh-jobs/view';
 import type { SessionStatsProjection } from '@deepseek-ai/dsh-session-stats/client';
 import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client';
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots';
+import type { ModelIdentity } from '../model-identity.ts';
+export type { ModelIdentity } from '../model-identity.ts';
 import { type CostPrices, type StatusBarConfig, type SegmentId } from './config.ts';
 import type { NS } from './locales.ts';
 import type { HolidayCalendar, HolidayOverride } from './pricing-types.ts';
@@ -21,11 +23,6 @@ export interface SegmentView {
     /** Status segment only: drives the leading state dot. */
     state?: StatusState;
     text: string;
-}
-/** Last model identity (projection first, node provider metadata as fallback). */
-export interface ModelIdentity {
-    provider: string;
-    model: string;
 }
 export interface SegmentSource {
     /** Settled-message slice of the Chat view: nodes, turn timings, partial, running calls. */
@@ -78,7 +75,7 @@ export declare function sessionElapsed(chat: LegacyConversationSlice, now: numbe
  */
 export declare function buildSegments(source: SegmentSource, config: StatusBarConfig, t: T): SegmentView[];
 /**
- * Effective input/output/cache prices per 1M tokens for the current model,
+ * Effective input/output/cache prices per 1M tokens for the requested model,
  * straight from the user-maintained price book (each model has its own
  * prices and peak schedule). Returns null when the model has no entry —
  * the cost segment then hides instead of guessing.
@@ -114,7 +111,8 @@ export declare function costOfUsage(usage: {
 export interface UsageHistoryRow {
     seq: number;
     time: number;
-    model: string | null;
+    requestedModel: string | null;
+    responseModel: string | null;
     input: number;
     /** Cache-hit tokens of this step (priced at the model's cacheRead rate). */
     cacheRead: number;
@@ -126,11 +124,9 @@ export interface UsageHistoryRow {
 /**
  * Recent per-step usage rows from the settled window: the last assistant
  * nodes that carried provider-reported usage, newest first. Each step's cost
- * is priced with the model that ACTUALLY produced that step (from the host
- * `sessionUsage` fold, node provider metadata as fallback), applying that
- * model's own price-book entry (with peak/off-peak) at the step's wall-clock
+ * uses that step's REQUESTED model from the host fold (legacy node metadata
+ * as fallback), applying its price-book entry at the step's wall-clock
  * time.
  */
 export declare function usageHistory(chat: LegacyConversationSlice, state: SessionUsageClientState | undefined, cost: CostPrices, limit?: number, context?: PricingContext): UsageHistoryRow[];
-export {};
 //# sourceMappingURL=segments.d.ts.map

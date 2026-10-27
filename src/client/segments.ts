@@ -11,6 +11,8 @@ import type { JobView } from '@deepseek-ai/dsh-jobs/view'
 import type { SessionStatsProjection } from '@deepseek-ai/dsh-session-stats/client'
 import type { TokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import type { ModelIdentity } from '../model-identity.ts'
+export type { ModelIdentity } from '../model-identity.ts'
 import { modelConfigFor, type CostPrices, type StatusBarConfig, type SegmentId } from './config.ts'
 import { formatCost, formatDuration, formatTokens, formatTokensPerSecond } from './format.ts'
 import type { NS } from './locales.ts'
@@ -38,12 +40,6 @@ export interface SegmentView {
   /** Status segment only: drives the leading state dot. */
   state?: StatusState
   text: string
-}
-
-/** Last model identity (projection first, node provider metadata as fallback). */
-export interface ModelIdentity {
-  provider: string
-  model: string
 }
 
 export interface SegmentSource {
@@ -130,10 +126,12 @@ export function lastModel(
   chat: LegacyConversationSlice,
   sessionModel: ModelIdentity | undefined,
 ): ModelIdentity | null {
-  if (sessionModel !== undefined && sessionModel.model !== null) return sessionModel
+  if (sessionModel !== undefined) return sessionModel
   for (let i = chat.nodes.length - 1; i >= 0; i -= 1) {
     const node = chat.nodes[i]
-    if (node?.kind === 'assistant' && node.providerMetadata !== undefined) return node.providerMetadata
+    // Stop at the latest assistant, even if its metadata is absent. Never
+    // borrow an identity from an older message to complete this one.
+    if (node?.kind === 'assistant') return stepModel(undefined, node.seq, node.providerMetadata)
   }
   return null
 }
@@ -184,7 +182,7 @@ export function buildSegments(source: SegmentSource, config: StatusBarConfig, t:
 }
 
 /**
- * Effective input/output/cache prices per 1M tokens for the current model,
+ * Effective input/output/cache prices per 1M tokens for the requested model,
  * straight from the user-maintained price book (each model has its own
  * prices and peak schedule). Returns null when the model has no entry —
  * the cost segment then hides instead of guessing.
@@ -212,7 +210,7 @@ export function effectivePrices(
   reason: BillingReason | null
   day: DayFacts
 } | null {
-  const config = modelConfigFor(cost, model?.model)
+  const config = modelConfigFor(cost, model?.requestedModel)
   if (config === undefined) return null
   const lookup = index ?? holidayIndex(calendars, overrides)
   const billing = resolveBilling(config, lookup, now, dayRules)
@@ -256,7 +254,8 @@ export function costOfUsage(
 export interface UsageHistoryRow {
   seq: number
   time: number
-  model: string | null
+  requestedModel: string | null
+  responseModel: string | null
   input: number
   /** Cache-hit tokens of this step (priced at the model's cacheRead rate). */
   cacheRead: number
@@ -269,9 +268,8 @@ export interface UsageHistoryRow {
 /**
  * Recent per-step usage rows from the settled window: the last assistant
  * nodes that carried provider-reported usage, newest first. Each step's cost
- * is priced with the model that ACTUALLY produced that step (from the host
- * `sessionUsage` fold, node provider metadata as fallback), applying that
- * model's own price-book entry (with peak/off-peak) at the step's wall-clock
+ * uses that step's REQUESTED model from the host fold (legacy node metadata
+ * as fallback), applying its price-book entry at the step's wall-clock
  * time.
  */
 export function usageHistory(
@@ -302,7 +300,8 @@ export function usageHistory(
     rows.push({
       seq: node.seq,
       time: node.time,
-      model: model?.model ?? null,
+      requestedModel: model?.requestedModel ?? null,
+      responseModel: model?.responseModel ?? null,
       input,
       cacheRead,
       cacheWrite,
@@ -334,7 +333,13 @@ function segmentView(
     }
     case 'model': {
       const identity = lastModel(chat, source.sessionModel)
-      return identity === null ? null : { id, text: identity.model }
+      return identity === null ? null : {
+        id,
+        text: t('bar.model', {
+          requested: identity.requestedModel,
+          response: identity.responseModel ?? 'unknown',
+        }),
+      }
     }
     case 'title': {
       const title = summary?.displayTitle

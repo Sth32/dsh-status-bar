@@ -1,15 +1,19 @@
 /**
  * Host-side usage ledger: subscribes the global `session/event` feed, folds
  * every assistant-message's provider-reported token usage into hourly
- * buckets keyed by model, and persists the stream to a JSONL file inside
+ * buckets retaining both model identities, and persists the stream to a JSONL file inside
  * the plugin's local data directory so the chart survives restarts.
  */
 import type { SessionEvent } from '@deepseek-ai/dsh-session';
 /** One persisted usage record (one assistant message). */
 export interface UsageRecord {
+    version: 2;
     /** Unix epoch ms of the assistant/message event. */
     t: number;
-    model: string;
+    /** Legacy records did not retain a provider. */
+    provider: string | null;
+    requestedModel: string;
+    responseModel: string | null;
     input: number;
     cacheRead: number;
     cacheWrite: number;
@@ -24,7 +28,7 @@ export interface BucketUsage {
 }
 export type UsagePeriod = 'day' | 'week' | 'month';
 export declare class UsageLedger {
-    /** hourKey → model → usage. */
+    /** hourKey → [provider, requestedModel, responseModel] → aggregate record. */
     private hourly;
     private readonly file;
     constructor(dataDir: string);
@@ -34,7 +38,9 @@ export declare class UsageLedger {
     record(event: SessionEvent): void;
     private ingest;
     /**
-     * Query one period's buckets. `offset` 0 = current period, 1 = previous,
+     * Query totals by REQUESTED model for the existing price book/chart API.
+     * The durable aggregates still retain response identities independently.
+     * `offset` 0 = current period, 1 = previous,
      * etc. Buckets are produced in chronological order with a stable key
      * (day: 'HH:00'; week/month: 'MM-DD').
      */

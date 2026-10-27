@@ -1,7 +1,7 @@
 /**
  * Host-side usage ledger: subscribes the global `session/event` feed, folds
  * every assistant-message's provider-reported token usage into hourly
- * buckets keyed by model, and persists the stream to a JSONL file inside
+ * buckets retaining both model identities, and persists the stream to a JSONL file inside
  * the plugin's local data directory so the chart survives restarts.
  */
 
@@ -9,12 +9,17 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import type { SessionEvent } from '@deepseek-ai/dsh-session'
+import { modelIdentityFromSource } from './model-identity.ts'
 
 /** One persisted usage record (one assistant message). */
 export interface UsageRecord {
+  version: 2
   /** Unix epoch ms of the assistant/message event. */
   t: number
-  model: string
+  /** Legacy records did not retain a provider. */
+  provider: string | null
+  requestedModel: string
+  responseModel: string | null
   input: number
   cacheRead: number
   cacheWrite: number
@@ -52,9 +57,35 @@ function addUsage(target: BucketUsage, u: BucketUsage): void {
   target.output += u.output
 }
 
+/** Legacy `model` was the request identity; it cannot recover a response. */
+function readRecord(value: unknown): UsageRecord | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+  const raw = value as Record<string, unknown>
+  if (raw.version !== undefined && raw.version !== 2) return null
+  const legacy = raw.version === undefined
+  const requestedModel = legacy ? raw.model : raw.requestedModel
+  if (typeof requestedModel !== 'string' || requestedModel.trim().length === 0) return null
+  for (const field of ['t', 'input', 'cacheRead', 'cacheWrite', 'output']) {
+    if (typeof raw[field] !== 'number' || !Number.isFinite(raw[field]) || raw[field] < 0) return null
+  }
+  if (!Number.isFinite(new Date(raw.t as number).getTime())) return null
+  return {
+    version: 2,
+    t: raw.t as number,
+    provider: !legacy && typeof raw.provider === 'string' && raw.provider.trim() ? raw.provider : null,
+    requestedModel,
+    responseModel: !legacy && typeof raw.responseModel === 'string' && raw.responseModel.trim()
+      ? raw.responseModel : null,
+    input: raw.input as number,
+    cacheRead: raw.cacheRead as number,
+    cacheWrite: raw.cacheWrite as number,
+    output: raw.output as number,
+  }
+}
+
 export class UsageLedger {
-  /** hourKey → model → usage. */
-  private hourly = new Map<string, Map<string, BucketUsage>>()
+  /** hourKey → [provider, requestedModel, responseModel] → aggregate record. */
+  private hourly = new Map<string, Map<string, UsageRecord>>()
   private readonly file: string
 
   constructor(dataDir: string) {
@@ -69,13 +100,19 @@ export class UsageLedger {
       const cutoff = Date.now() - RETENTION_MS
       let lineCount = 0
       let stale = 0
+      let unreadable = false
       for (const line of readFileSync(this.file, 'utf8').split('\n')) {
         if (line.trim().length === 0) continue
         lineCount += 1
-        let record: UsageRecord
+        let record: UsageRecord | null
         try {
-          record = JSON.parse(line) as UsageRecord
+          record = readRecord(JSON.parse(line))
         } catch {
+          unreadable = true
+          continue
+        }
+        if (record === null) {
+          unreadable = true
           continue
         }
         if (record.t < cutoff) {
@@ -86,7 +123,8 @@ export class UsageLedger {
       }
       // Rewrite the file when the stale tail is significant (keeps the
       // durable file bounded without per-event rewriting).
-      if (stale > 0 && stale > lineCount / 4) this.rewriteFile()
+      // Do not destroy an unreadable or future-version row during migration.
+      if (!unreadable && stale > 0 && stale > lineCount / 4) this.rewriteFile()
     } catch {
       // A corrupt/unreadable ledger must never block plugin startup.
     }
@@ -95,11 +133,9 @@ export class UsageLedger {
   private rewriteFile(): void {
     const lines: string[] = []
     const cutoff = Date.now() - RETENTION_MS
-    for (const [key, models] of this.hourly) {
-      const time = Number(new Date(`${key.replace('T', 'T')}:00`))
-      if (Number.isNaN(time) || time < cutoff) continue
-      for (const [model, usage] of models) {
-        lines.push(JSON.stringify({ t: time, model, ...usage }))
+    for (const models of this.hourly.values()) {
+      for (const record of models.values()) {
+        if (record.t >= cutoff) lines.push(JSON.stringify(record))
       }
     }
     try {
@@ -114,11 +150,12 @@ export class UsageLedger {
     if (event.type !== 'assistant/message') return
     const usage = event.data.usage
     if (usage === undefined) return
-    const source = event.data.message.source
-    if (source.kind !== 'model') return
+    const identity = modelIdentityFromSource(event.data.message.source)
+    if (identity === null) return
     const record: UsageRecord = {
+      version: 2,
       t: event.time,
-      model: source.model,
+      ...identity,
       input: usage.inputTokens,
       cacheRead: usage.cacheReadTokens ?? 0,
       cacheWrite: usage.cacheWriteTokens ?? 0,
@@ -139,21 +176,23 @@ export class UsageLedger {
       models = new Map()
       this.hourly.set(key, models)
     }
-    const usage = models.get(record.model) ?? emptyUsage()
-    addUsage(usage, record)
-    models.set(record.model, usage)
+    const identityKey = JSON.stringify([record.provider, record.requestedModel, record.responseModel])
+    const aggregate = models.get(identityKey)
+    if (aggregate === undefined) models.set(identityKey, { ...record })
+    else addUsage(aggregate, record)
     // Rolling cleanup (amortized: a few maps per new hour).
     if (this.hourly.size > 24 * 130) {
       const cutoff = Date.now() - RETENTION_MS
-      for (const [key2, models2] of this.hourly) {
-        if (Date.now() - Number(new Date(`${key2}T00:00`)) < cutoff) continue
-        if (models2.size === 0) this.hourly.delete(key2)
+      for (const key2 of this.hourly.keys()) {
+        if (new Date(`${key2}:00`).getTime() + 3_600_000 <= cutoff) this.hourly.delete(key2)
       }
     }
   }
 
   /**
-   * Query one period's buckets. `offset` 0 = current period, 1 = previous,
+   * Query totals by REQUESTED model for the existing price book/chart API.
+   * The durable aggregates still retain response identities independently.
+   * `offset` 0 = current period, 1 = previous,
    * etc. Buckets are produced in chronological order with a stable key
    * (day: 'HH:00'; week/month: 'MM-DD').
    */
@@ -172,21 +211,20 @@ export class UsageLedger {
         ? `${String(new Date(bucketTime).getHours()).padStart(2, '0')}:00`
         : `${String(new Date(bucketTime).getMonth() + 1).padStart(2, '0')}-${String(new Date(bucketTime).getDate()).padStart(2, '0')}`
       const models = new Map<string, BucketUsage>()
-      if (period === 'day') {
-        const hourMap = this.hourly.get(hourKey(bucketTime))
-        if (hourMap !== undefined) {
-          for (const [model, usage] of hourMap) models.set(model, { ...usage })
+      const mergeHour = (hourMap: Map<string, UsageRecord> | undefined): void => {
+        if (hourMap === undefined) return
+        for (const record of hourMap.values()) {
+          const target = models.get(record.requestedModel) ?? emptyUsage()
+          addUsage(target, record)
+          models.set(record.requestedModel, target)
         }
+      }
+      if (period === 'day') {
+        mergeHour(this.hourly.get(hourKey(bucketTime)))
       } else {
         // Fold the 24 hourly buckets of each day.
         for (let h = 0; h < 24; h += 1) {
-          const hourMap = this.hourly.get(hourKey(bucketTime + h * 3_600_000))
-          if (hourMap === undefined) continue
-          for (const [model, usage] of hourMap) {
-            const target = models.get(model) ?? emptyUsage()
-            addUsage(target, usage)
-            models.set(model, target)
-          }
+          mergeHour(this.hourly.get(hourKey(bucketTime + h * 3_600_000)))
         }
       }
       buckets.push({ key, usage: Object.fromEntries(models) })

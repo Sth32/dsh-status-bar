@@ -1,32 +1,15 @@
 /**
  * `sessionUsage` projection unit: the whole session's token usage, folded
  * across every committed assistant/message event. Unlike `sessionModel`
- * (which keeps only the LAST model), this fold aggregates tokens PER MODEL
- * (keyed by model id) and remembers each sequence number's model identity
- * and wall-clock time (`bySeq`). That per-step model + timestamp lets the
- * client price each step with the model that actually produced it, applying
- * that model's peak/off-peak schedule at the step's own time.
+ * (which keeps only the LAST model pair), this fold aggregates tokens by
+ * REQUESTED model and keeps each message's pair and timestamp in `bySeq`.
+ * Pricing continues to use the request's price-book entry and schedule.
  */
 
 import { z } from 'zod'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-
-/** Aggregated whole-session usage per model plus a per-step model ledger. */
-export interface SessionUsageState {
-  /** model id → whole-session token buckets across that model's messages. */
-  models: Record<string, {
-    input: number
-    cacheRead: number
-    cacheWrite: number
-    output: number
-  }>
-  /** String(event.seq) → the model/provid/time of the step that produced it. */
-  bySeq: Record<string, {
-    provider: string
-    model: string
-    time: number
-  }>
-}
+import { modelIdentityFromSource, type SessionUsageState } from './model-identity.ts'
+export type { SessionUsageState } from './model-identity.ts'
 
 const sessionUsageSchema = z.object({
   models: z.record(z.string(), z.object({
@@ -37,7 +20,8 @@ const sessionUsageSchema = z.object({
   }).strict()),
   bySeq: z.record(z.string(), z.object({
     provider: z.string(),
-    model: z.string(),
+    requestedModel: z.string(),
+    responseModel: z.string().nullable(),
     time: z.number(),
   }).strict()),
 }).strict()
@@ -61,11 +45,9 @@ export const sessionUsageProjectionDefinition = {
     if (event.type !== 'assistant/message') return state
     const usage = event.data.usage
     if (usage === undefined) return state
-    const source = event.data.message.source
-    if (source.kind !== 'model') return state
-
-    const { model, provider } = source
-    const current = state.models[model]
+    const identity = modelIdentityFromSource(event.data.message.source)
+    if (identity === null) return state
+    const current = state.models[identity.requestedModel]
     const nextModel = {
       input: (current?.input ?? 0) + usage.inputTokens,
       cacheRead: (current?.cacheRead ?? 0) + (usage.cacheReadTokens ?? 0),
@@ -73,10 +55,10 @@ export const sessionUsageProjectionDefinition = {
       output: (current?.output ?? 0) + usage.outputTokens,
     }
     return {
-      models: { ...state.models, [model]: nextModel },
-      bySeq: { ...state.bySeq, [String(event.seq)]: { provider, model, time: event.time } },
+      models: { ...state.models, [identity.requestedModel]: nextModel },
+      bySeq: { ...state.bySeq, [String(event.seq)]: { ...identity, time: event.time } },
     }
   },
   wire: { viewSchema: sessionUsageSchema, view: state => state },
-  stateVersion: 1,
+  stateVersion: 2,
 } satisfies ProjectionDefinition<'sessionUsage', SessionUsageState>

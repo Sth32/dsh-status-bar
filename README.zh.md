@@ -1,10 +1,10 @@
 # dsh-status-bar · 一眼看清你的 agent 正在做什么
 
-> **✅ 已适配 DSH 桌面版 —— DSH `0.2.1-rc.2`。**
+> **目标版本：DSH `0.2.1-rc.3`。构建与回归测试已通过，桌面版 / provider 集成测试待本地验证。**
 > **`0.2.x` 版本线面向桌面版运行时：请把它安装到 `desktop` profile（应用内「插件」页，或 `dsh plugin --profile desktop add …`）。**
 > **已停止维护的 `0.1.x` 版本线面向旧的 `0.1.x` 运行时，无法在 0.2.x 桌面版上加载。**
 
-[![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.2-blue)](https://github.com/deepseek-ai/deepseek-harness) [![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2FStarlight-bananice%2Fdsh-status-bar%2Ftags&query=%24%5B0%5D.name&label=version&color=green)](https://github.com/Starlight-bananice/dsh-status-bar/releases) [![npm](https://img.shields.io/npm/v/@bananiceee/dsh-status-bar)](https://www.npmjs.com/package/@bananiceee/dsh-status-bar) [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE) [![topic](https://img.shields.io/badge/topic-dsh--plugin-orange)](https://github.com/topics/dsh-plugin) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.3-blue)](https://github.com/deepseek-ai/deepseek-harness) [![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2FStarlight-bananice%2Fdsh-status-bar%2Ftags&query=%24%5B0%5D.name&label=version&color=green)](https://github.com/Starlight-bananice/dsh-status-bar/releases) [![npm](https://img.shields.io/npm/v/@bananiceee/dsh-status-bar)](https://www.npmjs.com/package/@bananiceee/dsh-status-bar) [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE) [![topic](https://img.shields.io/badge/topic-dsh--plugin-orange)](https://github.com/topics/dsh-plugin) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
 [English](README.md) · [中文](README.zh.md)
 
@@ -21,7 +21,8 @@
 - **桌面版原生，而非外挂** —— **针对 DSH 0.2 桌面版运行时重建**（`@deepseek-ai/dsh-*@0.2.0-rc.2`）：会话事实来自桌面版自身的 Chat / 会话 / 输入框服务，后台任务来自其任务服务，实时吞吐数字来自其自身的流式事件窗口。没有兼容垫片，也不保留旧版兼容路径。
 - **接近原生体验，且完全由你掌控** —— 16 个可开关的信息段（上下文圆环固定在底栏右侧，其余 15 个可排序）：状态点、模型、标题、工作区、轮次与步数、模型/工具耗时、TTFT 与解码速度、缓存命中率、Token、上下文占用、实时 TPS、会话时长、费用估算、任务、队列、错误
 - **实时吞吐（TPS）** —— 底栏在浏览器内直接折叠本会话自己的实时流，流式生成期间速度随分块逐块刷新，无论流以多细的粒度送达都能反映真实生成速率；无需轮询、无需 host 往返，也无需外部 live-stats 插件
-- **费用估算 + 用户维护的模型价格手册** —— 每个模型独立的价格与峰/谷时段，**每条消息/每一步都按实际产出它的模型计价**（输入、缓存命中、缓存写入、输出四类分别按该步发生时刻取价）；「用量与费用」弹窗内置堆叠费用趋势图（日 / 周 / 月）、分页的逐步用量历史（含独立的缓存命中列）与总成本展示
+- **区分请求模型与 SDK 报告的响应模型** —— 两个字段来自同一条已记录消息；响应字段缺失时明确显示 `unknown`。SDK 报告不证明后端真实性，详见[来源证据与限制](docs/model-provenance.md)。
+- **费用估算 + 用户维护的模型价格手册** —— 每个模型独立的价格与峰/谷时段，**每条消息/每一步按其请求模型计价**（输入、缓存命中、缓存写入、输出四类分别按该步发生时刻取价）；「用量与费用」弹窗内置堆叠费用趋势图（日 / 周 / 月）、分页的逐步用量历史（含请求 / 响应模型列与独立的缓存命中列）与总成本展示
 - **跟得上 DeepSeek 反复调整的峰谷规则** —— 不再是把时段写死成一组 `HH:MM`：改为「工作日 / 周末 / 法定节假日」三类日判定，节假日与调休日历一键拉取并缓存在本地、可手动增删例外日期；DeepSeek 之后无论是改时段、改周末规则、还是新增节假日与调休安排，你只需刷新一次日历或改一个时段，不必重配整个价格表
 - **零配置开箱即用** —— 13 个信息段默认开启，其余勾选即得
 - **多项实用选项** —— 多行换行显示（内容再多也不会被截断省略）、逐模型费用估算（支持峰谷计价）、币种切换（CNY / USD）、齿轮快捷开关菜单，以及带一键重置的专属设置页
@@ -46,11 +47,25 @@
 
 | 项目 | 说明 |
 |---|---|
-| **DSH 桌面版** | **`0.2.1-rc.2`——本版本线适配的目标；最后验证于 2026-10-19** |
+| **DSH 目标版本** | **`0.2.1-rc.3`——2026-10-27 已通过源码核实、完整构建和 19 项回归测试；桌面版 / provider 集成待验证** |
+| 构建依赖 | 保留现有 `0.2.0-rc.2` devDependencies 与 lockfile；临时副本中的 18 个直接 DSH 依赖全部换为 `0.2.1-rc.3` 后，也通过完整构建和相同测试。 |
 | **插件版本线** | **`0.2.x` 面向桌面版运行时。`0.1.x` 面向已停止维护的 `0.1.x` 运行时，无法在 0.2.x 桌面版上加载。** |
 | DSH profile | 打包桌面应用使用 `desktop` · 自建 `dsh web` 使用 `web` · CLI 运行时使用 `headless` |
 | 运行环境 | Node ≥ 22（host）+ 现代浏览器（client）；无外部服务依赖 |
 | 共存关系 | 与任何其他状态栏/TPS 插件互不干扰：实时速率在客户端折叠本会话自己的事件窗口，因此本插件**不注册任何共享投影键**——任何对等插件的键名、`stateVersion` 或注册先后都无法顶掉底栏的 TPS |
+
+### 模型字段的含义
+
+底栏显示「请求 A · 响应（SDK 报告）B」，用量历史为每个步骤保留两个字段。
+下一条报告 C、再下一条缺少响应字段时，依次显示 A/C、A/unknown。
+费用估算和趋势图仍按请求模型 A 聚合和查价。
+
+DSH rc.3 锁定 pi-ai 1.1.0。该 SDK 的 Anthropic 和 OpenAI Chat Completions
+路径只在响应模型与请求模型不同时保留字段；OpenAI Responses 路径没有保留它。
+因此 `unknown` 也可能表示 SDK 省略了相同的模型，不能反推真实响应值。
+原生 DeepSeek 以及没有此 metadata 的旧记录同样显示 `unknown`。
+实现不使用全局网络 hook，不修改 DSH 核心。具体源码、账本迁移规则和本地测试步骤
+见[来源证据文档](docs/model-provenance.md)。
 
 ### 桌面版移植改了什么（0.2.0）
 
@@ -190,7 +205,7 @@ dsh plugin --profile desktop remove @bananiceee/dsh-status-bar
 | 段 | 内容 | 数据源 |
 |---|---|---|
 | 状态 | ● 运行中 / 空闲 / 出错状态点 | 会话快照 `running` / `lastAgentError` + chat `partial` / `runningCalls` |
-| 模型 | 最近一次响应的模型 | `sessionModel` 投影（host 折叠 assistant/message 事件） |
+| 请求 / 响应模型 | 最近一条已记录消息的请求与 SDK 报告（缺失为 `unknown`） | `sessionModel` 投影；两个字段读取同一条 assistant/message 的 source |
 | 标题 | 会话标题（超长截断） | `SessionSummary.displayTitle` |
 | 工作区 | 工作区目录名 | `SessionSummary.cwd` |
 | 轮次与步数 | N 轮 · M 步 | `sessionStats` 投影（无投影时窗口折叠回退） |
@@ -210,10 +225,10 @@ dsh plugin --profile desktop remove @bananiceee/dsh-status-bar
 
 | 类别 | 插件会触及什么 |
 |---|---|
-| 文件 | host 侧把用量账本写入 `<DSH_HOME>/dsh-status-bar/usage.jsonl`（默认 `~/.dsh/dsh-status-bar/usage.jsonl`；每条 assistant 消息一条记录：时间戳、模型、input/cacheRead/cacheWrite/output token 数）。内存中的历史为 120 天滚动窗口。 |
+| 文件 | host 侧写入 `<DSH_HOME>/dsh-status-bar/usage.jsonl`（默认 `~/.dsh/dsh-status-bar/usage.jsonl`）：version 2 记录保留时间戳、provider、requestedModel、可为空的 responseModel 与四类 token 数。按小时压缩仍保留模型配对；旧 `model` 记录只作为请求模型读取。内存历史为 120 天滚动窗口。 |
 | 网络 | 客户端只访问插件自身的本地 webserver 路由（与 DSH Web UI 同源，`127.0.0.1`）：`/status-bar/api/usage` 提供图表分桶数据，`/status-bar/api/holidays` 提供节假日日历。仅在你点击「刷新日历」或缓存过期（12 小时）时，host 才会向公开数据源 `cdn.jsdelivr.net`（holiday-cn 数据集）发起一次 GET 以更新日历——关掉「自动获取」即完全不出站。 |
 | 凭据 | **无。** 插件从不读取、存储或传输 API 密钥、Token 或 Cookie。 |
-| 用户数据 | 客户端：`localStorage["dsh.statusBar.v1"]`（底栏配置 + 价格手册 + 节假日例外）、`localStorage["dsh.statusBar.holidays.v1"]`（节假日日历缓存）——不含任何对话内容。host 侧：用量账本（仅 token 计数）与 `holidays.json` 日历缓存；均不含提示词、消息、文件内容。 |
+| 用户数据 | 客户端：`localStorage["dsh.statusBar.v1"]`（底栏配置 + 价格手册 + 节假日例外）、`localStorage["dsh.statusBar.holidays.v1"]`（节假日日历缓存）——不含任何对话内容。host 侧：用量账本（模型标识、时间戳和 token 计数）与 `holidays.json` 日历缓存；均不含提示词、消息正文、文件内容。 |
 
 ## Troubleshooting（故障排查）
 
@@ -236,9 +251,12 @@ dsh plugin --profile desktop remove @bananiceee/dsh-status-bar
 
 ## Development（开发）
 
+测试使用 Node 24 的内置 TypeScript 支持。源码核实和自动化测试不替代桌面版 / provider 集成测试。
+
 ```sh
-pnpm install            # devDependencies：typescript / tsdown / react / @types，以及本插件编译所依赖的 DSH 包（精确钉在 @deepseek-ai/*@0.2.0-rc.2）
+pnpm install --frozen-lockfile # 保留既有工具链与 DSH devDependencies
 pnpm run build          # host tsc → lib/，客户端声明 → lib/types/client，tsdown → lib/client.js
+pnpm test               # 模型字段、显示、费用和账本回归测试
 pnpm run typecheck:client   # 仅做客户端类型检查
 pnpm run verify         # 重新构建，并在提交的 lib/ 与 src/ 不一致时报错
 ```

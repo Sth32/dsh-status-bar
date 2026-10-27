@@ -2,8 +2,8 @@
  * Shared whole-session cost pricing on the `sessionUsage` projection.
  *
  * The cost segment, usage dialog total, and history rows all price per step
- * with the model that ACTUALLY produced that step's tokens (from the host
- * `sessionUsage` fold), applying that model's own price-book entry AND its
+ * with the REQUESTED model of that step (from the host `sessionUsage` fold),
+ * applying that request identity's price-book entry AND its
  * peak/off-peak schedule at the step's own wall-clock time — instead of the
  * old whole-session-tokens × last-model-price approximation.
  */
@@ -16,6 +16,7 @@ import {
   type ModelIdentity,
 } from './segments.ts'
 import { holidayIndex, type HolidayIndex } from './timezone.ts'
+import { modelIdentityFromProjection, type SessionUsageState } from '../model-identity.ts'
 
 /**
  * Day-rule context every price lookup needs: whether the day-aware rules are
@@ -41,20 +42,8 @@ function pricingContext(context?: PricingContext): Required<PricingContext> {
   }
 }
 
-/** Shape of the host `sessionUsage` projection's view (declared independently so this module stays host-free). */
-export interface SessionUsageClientState {
-  models: Record<string, {
-    input: number
-    cacheRead: number
-    cacheWrite: number
-    output: number
-  }>
-  bySeq: Record<string, {
-    provider: string
-    model: string
-    time: number
-  }>
-}
+/** Shared view type; importing it adds no host runtime dependency. */
+export type SessionUsageClientState = SessionUsageState
 
 export interface CostBreakdown {
   perModel: ReadonlyMap<string, number>
@@ -81,7 +70,7 @@ export function costBreakdown(
   const pricedModels: string[] = []
   let total = 0
   for (const [model, usage] of Object.entries(state.models)) {
-    const identity: ModelIdentity = { provider: 'unknown', model }
+    const identity: ModelIdentity = { provider: 'unknown', requestedModel: model, responseModel: null }
     const prices = effectivePrices(identity, cost, now, rules.dayRules, [], rules.overrides, rules.index)
     if (prices === null) continue
     if (prices.input <= 0 && prices.cacheRead <= 0 && prices.cacheWrite <= 0 && prices.output <= 0) continue
@@ -108,12 +97,18 @@ export function stepModel(
   seq: number,
   provenance: { provider: string; model: string } | undefined,
 ): ModelIdentity | null {
-  return state?.bySeq[String(seq)] ?? provenance ?? null
+  const entry = state?.bySeq[String(seq)]
+  if (entry !== undefined) return modelIdentityFromProjection(entry)
+  // Legacy node metadata supports a request identity only. Do not treat
+  // unrelated/custom fields on that object as an SDK response envelope.
+  return modelIdentityFromProjection(provenance === undefined ? undefined : {
+    provider: provenance.provider, model: provenance.model,
+  })
 }
 
 /**
- * Cost of ONE step's token usage, priced with the model that produced it and
- * that model's price-book entry at the step's own wall-clock time (peak/off-peak
+ * Cost of ONE step's token usage, priced with its REQUESTED model's
+ * price-book entry at the step's own wall-clock time (peak/off-peak
  * applied to the fold's recorded time, falling back to `now`). Returns null
  * when the step's model is unknown or unconfigured.
  */

@@ -113,7 +113,8 @@ declare const zh: {
     'usage.history': string;
     'usage.historyHint': string;
     'usage.time': string;
-    'usage.model': string;
+    'usage.requestedModel': string;
+    'usage.responseModel': string;
     'usage.cost': string;
     'usage.empty': string;
     'usage.prev': string;
@@ -167,6 +168,7 @@ declare const zh: {
     'bar.status.running': string;
     'bar.status.idle': string;
     'bar.status.error': string;
+    'bar.model': string;
     'bar.counts': string;
     'bar.llm': string;
     'bar.toolCall': string;

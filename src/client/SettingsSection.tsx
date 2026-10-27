@@ -238,7 +238,7 @@ function ModelCard({
   }
 
   const prices = effectivePrices(
-    { provider: 'unknown', model },
+    { provider: 'unknown', requestedModel: model, responseModel: null },
     getConfig().cost,
     now,
     dayRules,
@@ -574,7 +574,7 @@ export const SettingsSection = memo(function SettingsSection(props: SettingsSect
   const { index } = useHolidayView(config.calendar.overrides)
   useHolidayAutoFetch(config.calendar.autoFetch)
   const currentPricing = effectivePrices(
-    currentModel !== undefined ? { provider: 'unknown', model: currentModel } : null,
+    currentModel !== undefined ? { provider: 'unknown', requestedModel: currentModel, responseModel: null } : null,
     config.cost,
     now,
   )

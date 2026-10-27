@@ -21,6 +21,7 @@ import { StatusPill } from './StatusPill.tsx'
 import { NS } from './locales.ts'
 import './projections.ts'
 import { ChartCard } from './ChartCard.tsx'
+import { modelIdentityFromProjection } from '../model-identity.ts'
 
 export type UsageDialogEntryProps =
   PropsRuntime<'conversation.input.right'> & PropsLocale<typeof NS>
@@ -58,7 +59,8 @@ function HistoryTable({ rows, currency, t }: {
           <thead>
             <tr>
               <th>{t('usage.time')}</th>
-              <th>{t('usage.model')}</th>
+              <th className="model">{t('usage.requestedModel')}</th>
+              <th className="model">{t('usage.responseModel')}</th>
               <th className="num">{t('usage.input')}</th>
               <th className="num">{t('usage.cacheRead')}</th>
               <th className="num">{t('usage.output')}</th>
@@ -76,7 +78,8 @@ function HistoryTable({ rows, currency, t }: {
                     minute: '2-digit',
                   })}
                 </td>
-                <td className="model">{row.model ?? '—'}</td>
+                <td className="model" title={row.requestedModel ?? 'unknown'}>{row.requestedModel ?? 'unknown'}</td>
+                <td className="model" title={row.responseModel ?? 'unknown'}>{row.responseModel ?? 'unknown'}</td>
                 <td className="num">{formatTokens(row.input)}</td>
                 <td className="num">
                   {formatTokens(row.cacheRead)}
@@ -134,12 +137,10 @@ export const UsageDialogEntry = memo(function UsageDialogEntry(props: UsageDialo
   const now = Date.now()
   const breakdown = costBreakdown(sessionUsage, config.cost, now)
   const sessionModelValue = useProjection('sessionModel')
-  const sessionModel = sessionModelValue !== undefined && sessionModelValue.model !== null
-    ? { provider: sessionModelValue.provider ?? 'unknown', model: sessionModelValue.model }
-    : undefined
+  const sessionModel = modelIdentityFromProjection(sessionModelValue) ?? undefined
   const summary: SessionSummary | undefined = useSessions(state => state.byId[sessionId])
 
-  const modelConfig = modelConfigFor(config.cost, sessionModel?.model)
+  const modelConfig = modelConfigFor(config.cost, sessionModel?.requestedModel)
   const { index } = useHolidayView(config.calendar.overrides)
   useHolidayAutoFetch(config.calendar.autoFetch)
   const pricing = {
@@ -199,11 +200,11 @@ export const UsageDialogEntry = memo(function UsageDialogEntry(props: UsageDialo
                     )
                     : (
                       <>
-                        <span>{t('usage.unconfigured', { model: sessionModel.model })}</span>
+                        <span>{t('usage.unconfigured', { model: sessionModel.requestedModel })}</span>
                         <button
                           type="button"
                           className="dsb-usage-hero-add"
-                          onClick={() => setModelConfig(sessionModel.model, {})}
+                          onClick={() => setModelConfig(sessionModel.requestedModel, {})}
                         >
                           {t('usage.addDefault')}
                         </button>
@@ -219,7 +220,7 @@ export const UsageDialogEntry = memo(function UsageDialogEntry(props: UsageDialo
                       <PeakBadge config={modelConfig} index={index} now={now} t={t} />
                     )}
                     {sessionModel !== undefined && (
-                      <span className="dsb-usage-model-chip">{sessionModel.model}</span>
+                      <span className="dsb-usage-model-chip">{sessionModel.requestedModel}</span>
                     )}
                     {summary !== undefined && (
                       <span className="dsb-usage-model-chip">{summary.displayTitle}</span>
@@ -257,7 +258,7 @@ export const UsageDialogEntry = memo(function UsageDialogEntry(props: UsageDialo
           {modelConfig !== undefined && (
             <div className="dsb-usage-prices">
               <span className="dsb-usage-prices-title">
-                {t('usage.prices', { model: sessionModel?.model ?? '?' })}
+                {t('usage.prices', { model: sessionModel?.requestedModel ?? 'unknown' })}
               </span>
               {prices !== null && (
                 <>

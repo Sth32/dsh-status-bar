@@ -25,6 +25,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Model provenance and ledger regression tests
+        run: pnpm test
       - name: Syntax-check every shipped JS artifact
         run: |
           set -e

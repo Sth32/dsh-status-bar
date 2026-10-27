@@ -854,21 +854,14 @@ const STYLES = `
 .dsb-usage-table th.num {
   text-align: right;
   white-space: nowrap;
-}
-.dsb-usage-table td:nth-child(3),
-.dsb-usage-table th:nth-child(3),
-.dsb-usage-table td:nth-child(4),
-.dsb-usage-table th:nth-child(4),
-.dsb-usage-table td:nth-child(5),
-.dsb-usage-table th:nth-child(5) {
   min-width: 84px;
 }
 .dsb-usage-table td:nth-child(1),
 .dsb-usage-table th:nth-child(1) {
   min-width: 88px;
 }
-.dsb-usage-table td:nth-child(2),
-.dsb-usage-table th:nth-child(2) {
+.dsb-usage-table td.model,
+.dsb-usage-table th.model {
   min-width: 132px;
 }
 .dsb-usage-table td.model {

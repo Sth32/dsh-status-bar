@@ -1,10 +1,10 @@
 # dsh-status-bar · Know what your agent is doing — at a glance
 
-> **✅ Adapted to the DSH desktop app — DSH `0.2.1-rc.2`.**
+> **Target: DSH `0.2.1-rc.3`. Build and regression checks pass; desktop/provider integration testing is pending.**
 > **The `0.2.x` line is built for the desktop runtime: install it into the `desktop` profile (in-app **Plugins** page, or `dsh plugin --profile desktop add …`).**
 > **The retired `0.1.x` line targets the old `0.1.x` runtime and will NOT load on the 0.2.x desktop.**
 
-[![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.2-blue)](https://github.com/deepseek-ai/deepseek-harness) [![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2FStarlight-bananice%2Fdsh-status-bar%2Ftags&query=%24%5B0%5D.name&label=version&color=green)](https://github.com/Starlight-bananice/dsh-status-bar/releases) [![npm](https://img.shields.io/npm/v/@bananiceee/dsh-status-bar)](https://www.npmjs.com/package/@bananiceee/dsh-status-bar) [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE) [![topic](https://img.shields.io/badge/topic-dsh--plugin-orange)](https://github.com/topics/dsh-plugin) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
+[![DSH](https://img.shields.io/badge/DSH-0.2.1--rc.3-blue)](https://github.com/deepseek-ai/deepseek-harness) [![version](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2FStarlight-bananice%2Fdsh-status-bar%2Ftags&query=%24%5B0%5D.name&label=version&color=green)](https://github.com/Starlight-bananice/dsh-status-bar/releases) [![npm](https://img.shields.io/npm/v/@bananiceee/dsh-status-bar)](https://www.npmjs.com/package/@bananiceee/dsh-status-bar) [![license](https://img.shields.io/badge/license-MIT-blue)](LICENSE) [![topic](https://img.shields.io/badge/topic-dsh--plugin-orange)](https://github.com/topics/dsh-plugin) [![Awesome DSH Plugin](https://awesome-dsh-plugin.com/badge.svg)](https://awesome-dsh-plugin.com)
 
 [English](README.md) · [中文](README.zh.md)
 
@@ -21,7 +21,8 @@
 - **Desktop-native, not bolted on** — **rebuilt against the DSH 0.2 desktop runtime** (`@deepseek-ai/dsh-*@0.2.0-rc.2`): session facts come from the desktop's own Chat / session / composer services, background jobs from its job service, and the live throughput figure from its own streaming event window. No shims, no legacy compatibility path.
 - **Near-native experience, fully yours** — 16 toggleable segments (the context ring is pinned to the right; the other 15 are reorderable): status dot, model, title, workspace, turns & steps, model/tool time, TTFT & decode speed, cache-hit rate, tokens, context pressure, live TPS, session time, cost estimate, jobs, queue, errors
 - **Live throughput (TPS)** — the bar folds this session's own live stream in the browser, so the speed updates chunk by chunk while streaming and tracks the real generation rate regardless of how finely the stream is delivered; no polling, no host round-trip, no external live-stats plugin
-- **Cost estimation with a user-maintained model price book** — per-model rates, per-model peak/off-peak schedules, **each message/step priced with the model that actually produced it** (input, cache-hit, cache-write and output priced separately at that step's own time), and a «Usage & cost» dialog with a stacked cost-trend chart (day / week / month), a paged per-step usage history (with a dedicated cache-hit column), and a total-cost hero
+- **Separate requested and SDK-reported response models** — both belong to the same recorded message; a missing response report displays `unknown`. The SDK report does not verify the backend. See [provenance and limitations](docs/model-provenance.md).
+- **Cost estimation with a user-maintained model price book** — per-model rates, per-model peak/off-peak schedules, **each message/step priced by its requested model** (input, cache-hit, cache-write and output priced separately at that step's own time), and a «Usage & cost» dialog with a stacked cost-trend chart (day / week / month), a paged per-step usage history (with request/response model columns and a dedicated cache-hit column), and a total-cost hero
 - **Keeps up with DeepSeek's shifting peak/off-peak rules** — no more one hard-coded list of `HH:MM` windows: billing keys off **working day vs weekend vs public holiday**, with the holiday / 调休 calendar fetched and cached locally (and editable by hand). When DeepSeek moves the windows, changes the weekend rule, or adds holidays and make-up workdays, you refresh once or edit one field instead of rebuilding the price book
 - **Zero-config default** — 13 segments ship enabled; everything else is a checkbox away
 - **Useful options** — multi-line wrapping (so nothing gets truncated), per-model cost estimation with peak/off-peak pricing, currency choice (CNY / USD), a quick-toggle gear menu, and a dedicated settings page with one-click reset
@@ -46,11 +47,27 @@ The status bar replaces the built-in stats line with near-native live session te
 
 | Item | Value |
 |---|---|
-| **DSH desktop app** | **`0.2.1-rc.2` — the target of this line; verified 2026-10-19** |
+| **DSH target** | **`0.2.1-rc.3` — source audit, full build and 19 regression tests passed on 2026-10-27; desktop/provider integration pending** |
+| Build dependencies | Existing `0.2.0-rc.2` devDependencies and lockfile retained. A temporary copy also builds and passes the same tests with all 18 direct DSH packages at `0.2.1-rc.3`. |
 | **Plugin line** | **`0.2.x` for the desktop runtime. `0.1.x` targets the retired `0.1.x` runtime and will not load on the 0.2.x desktop.** |
 | DSH profile | `desktop` for the packaged app · `web` for a self-hosted `dsh web` · `headless` for the CLI runtime |
 | Runtime | Node ≥ 22 (host) + modern browser (client); no external services |
 | Peer relation | Independent of every other status/TPS plugin: the live rate is folded client-side from this session's own event window, so this plugin registers **no** shared projection key — no peer's key, `stateVersion`, or registration order can displace the bar's TPS |
+
+### Model identity semantics
+
+The model segment shows `Requested A · Response (SDK-reported) B`. The usage
+history preserves both fields for each step. If the next step reports C and the
+one after it supplies no response metadata, the bar becomes A/C then A/unknown.
+Pricing and chart aggregation continue to use A.
+
+DSH rc.3 locks pi-ai 1.1.0. Its Anthropic and OpenAI Chat Completions paths only
+retain a response model when it differs from the request; its OpenAI Responses
+path does not retain this field. Thus `unknown` can also mean that the SDK omitted
+an equal model. Native DeepSeek and legacy records without this metadata also
+show `unknown`. The plugin cannot infer the missing value. No global network hook
+or DSH core modification is used. See the [pinned source audit, ledger migration
+and local integration checklist](docs/model-provenance.md).
 
 ### What the desktop port changed (0.2.0)
 
@@ -190,7 +207,7 @@ All configuration is client-side, stored in browser `localStorage` under **`dsh.
 | Segment | Shows | Source |
 |---|---|---|
 | Status | ● running / idle / error dot | session snapshot `running` / `lastAgentError` + chat `partial` / `runningCalls` |
-| Model | model of the latest response | `sessionModel` projection (host fold of assistant/message events) |
+| Requested / response model | latest recorded message's request and SDK report (`unknown` if missing) | `sessionModel` projection; both fields read from the same assistant/message source |
 | Title | session title (truncated) | `SessionSummary.displayTitle` |
 | Workspace | workspace dir name | `SessionSummary.cwd` |
 | Turns & steps | N turns · M steps | `sessionStats` projection (window-fold fallback) |
@@ -210,10 +227,10 @@ All configuration is client-side, stored in browser `localStorage` under **`dsh.
 
 | Category | What the plugin touches |
 |---|---|
-| Files | Host writes the usage ledger to `<DSH_HOME>/dsh-status-bar/usage.jsonl` (`~/.dsh/dsh-status-bar/usage.jsonl` by default; one record per assistant message: timestamp, model, input/cacheRead/cacheWrite/output tokens). In-memory history is a rolling 120-day window. |
+| Files | Host writes `<DSH_HOME>/dsh-status-bar/usage.jsonl` (`~/.dsh/dsh-status-bar/usage.jsonl` by default): version 2 records retain timestamp, provider, requestedModel, nullable responseModel and input/cacheRead/cacheWrite/output tokens. Hourly compaction preserves model pairs. Legacy `model` rows load as request-only identities. In-memory history is a rolling 120-day window. |
 | Network | The client only calls the plugin's own local webserver routes (same origin as the DSH web UI, `127.0.0.1`): `/status-bar/api/usage` for chart buckets and `/status-bar/api/holidays` for the holiday calendar. Only when you hit "Refresh calendar" (or the 12-hour cache goes stale) does the host issue one GET to the public dataset host `cdn.jsdelivr.net` (holiday-cn) to update it — turn "Fetch and cache the holiday calendar automatically" off for zero outbound traffic. |
 | Credentials | **None.** The plugin never reads, stores, or transmits API keys, tokens, or cookies. |
-| User data | Client: `localStorage["dsh.statusBar.v1"]` (bar config + price book + holiday exceptions) and `localStorage["dsh.statusBar.holidays.v1"]` (calendar cache) — no conversation content. Host: the usage ledger above (token counts only) plus the `holidays.json` calendar cache; no prompts, messages, or file contents. |
+| User data | Client: `localStorage["dsh.statusBar.v1"]` (bar config + price book + holiday exceptions) and `localStorage["dsh.statusBar.holidays.v1"]` (calendar cache) — no conversation content. Host: the usage ledger above (model identities, timestamps and token counts) plus the `holidays.json` calendar cache; no prompts, message text, or file contents. |
 
 ## Troubleshooting
 
@@ -236,9 +253,13 @@ All configuration is client-side, stored in browser `localStorage` under **`dsh.
 
 ## Development
 
+Use Node 24 for the tests (built-in TypeScript stripping). The source audit and
+automated tests do not replace desktop/provider integration testing.
+
 ```sh
-pnpm install            # devDependencies: typescript / tsdown / react / @types AND the DSH packages this plugin compiles against (pinned @deepseek-ai/*@0.2.0-rc.2)
+pnpm install --frozen-lockfile # retain the pinned toolchain and DSH devDependencies
 pnpm run build          # host tsc → lib/, client declarations → lib/types/client, tsdown → lib/client.js
+pnpm test               # model identity, display, pricing and ledger regression tests
 pnpm run typecheck:client   # client typecheck only
 pnpm run verify         # rebuild and fail if the committed lib/ drifted from src/
 ```

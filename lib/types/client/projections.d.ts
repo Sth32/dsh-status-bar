@@ -7,29 +7,13 @@
  * rate is folded client-side from the session's event window instead (see
  * ./live-rate.ts).
  */
+import type { SessionModelState, SessionUsageState } from '../model-identity.ts';
 declare module '@deepseek-ai/dsh-session-projection/types' {
     interface SessionProjectionMap {
         /** Last assistant-message model identity (host-side fold; absent until a message lands). */
-        sessionModel?: {
-            provider: string | null;
-            model: string | null;
-            updatedAt: number | null;
-        };
+        sessionModel?: SessionModelState;
         /** Whole-session per-model usage plus the per-step model/time ledger (host-side fold). */
-        sessionUsage?: {
-            models: Record<string, {
-                input: number;
-                cacheRead: number;
-                cacheWrite: number;
-                output: number;
-            }>;
-            bySeq: Record<string, {
-                provider: string;
-                model: string;
-                time: number;
-            }>;
-        };
+        sessionUsage?: SessionUsageState;
     }
 }
-export {};
 //# sourceMappingURL=projections.d.ts.map

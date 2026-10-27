@@ -26,6 +26,7 @@ import { noteCurrentModel } from './live-model.ts'
 import { buildSegments, deriveWindowStats, type SegmentView } from './segments.ts'
 import { ContextRing } from './ContextRing.tsx'
 import { NS } from './locales.ts'
+import { modelIdentityFromProjection } from '../model-identity.ts'
 import './projections.ts'
 
 /**
@@ -138,9 +139,7 @@ export const StatusBarDockEntry = memo(function StatusBarDockEntry(props: Status
   const liveRate = useThrottled(useLiveRate(view => view.tokensPerSecond), 500)
   useEffect(() => watchLiveRate(sessionId), [sessionId, watchLiveRate])
   const sessionModelValue = useProjection('sessionModel')
-  const sessionModel = sessionModelValue !== undefined && sessionModelValue.model !== null
-    ? { provider: sessionModelValue.provider ?? 'unknown', model: sessionModelValue.model }
-    : undefined
+  const sessionModel = modelIdentityFromProjection(sessionModelValue) ?? undefined
   const sessionUsage = useProjection('sessionUsage')
   // Session lifecycle facts and the settled Chat slice: 0.2.0 splits what the
   // old ConversationSnapshot carried — `useSession` owns running/lastAgentError,
@@ -157,7 +156,7 @@ export const StatusBarDockEntry = memo(function StatusBarDockEntry(props: Status
 
   // Publish the model in view for root-scoped surfaces (the Settings price
   // book has no session scope of its own in 0.2.0).
-  const currentModelName = sessionModel?.model
+  const currentModelName = sessionModel?.requestedModel
   useEffect(() => { noteCurrentModel(currentModelName) }, [currentModelName])
 
   // The sessionTime segment ticks once per second while the session runs.

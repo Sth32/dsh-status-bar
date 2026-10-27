@@ -1,5 +1,5 @@
 /**
- * Last model the bar observed for the session in view.
+ * Last REQUESTED model the bar observed for the session in view.
  *
  * 0.2.0-rc.2 removed `SessionListState.current`, so a ROOT-scoped surface (the
  * Settings page) no longer has a global "current session" whose `sessionModel`
@@ -18,7 +18,7 @@ function subscribe(listener: () => void): () => void {
   return () => { listeners.delete(listener) }
 }
 
-/** Publish the model the bar currently shows (called by the session-scoped bar). */
+/** Publish the request identity used by the price book, not the SDK report. */
 export function noteCurrentModel(model: string | undefined): void {
   if (model === current) return
   current = model
