@@ -133,8 +133,10 @@ declare const zh: {
     'usage.page': string;
     'seg.status': string;
     'seg.statusHint': string;
-    'seg.model': string;
-    'seg.modelHint': string;
+    'seg.requestedModel': string;
+    'seg.requestedModelHint': string;
+    'seg.responseModel': string;
+    'seg.responseModelHint': string;
     'seg.title': string;
     'seg.titleHint': string;
     'seg.workspace': string;
@@ -168,7 +170,8 @@ declare const zh: {
     'bar.status.running': string;
     'bar.status.idle': string;
     'bar.status.error': string;
-    'bar.model': string;
+    'bar.requestedModel': string;
+    'bar.responseModel': string;
     'bar.counts': string;
     'bar.llm': string;
     'bar.toolCall': string;

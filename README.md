@@ -19,12 +19,12 @@
 **What it does:**
 
 - **Desktop-native, not bolted on** — **rebuilt against the DSH 0.2 desktop runtime** (`@deepseek-ai/dsh-*@0.2.0-rc.2`): session facts come from the desktop's own Chat / session / composer services, background jobs from its job service, and the live throughput figure from its own streaming event window. No shims, no legacy compatibility path.
-- **Near-native experience, fully yours** — 16 toggleable segments (the context ring is pinned to the right; the other 15 are reorderable): status dot, model, title, workspace, turns & steps, model/tool time, TTFT & decode speed, cache-hit rate, tokens, context pressure, live TPS, session time, cost estimate, jobs, queue, errors
+- **Near-native experience, fully yours** — 17 toggleable segments (the context ring is pinned to the right; the other 16 are reorderable): status dot, requested model, response model, title, workspace, turns & steps, model/tool time, TTFT & decode speed, cache-hit rate, tokens, context pressure, live TPS, session time, cost estimate, jobs, queue, errors
 - **Live throughput (TPS)** — the bar folds this session's own live stream in the browser, so the speed updates chunk by chunk while streaming and tracks the real generation rate regardless of how finely the stream is delivered; no polling, no host round-trip, no external live-stats plugin
 - **Separate requested and SDK-reported response models** — both belong to the same recorded message; a missing response report displays `unknown`. The SDK report does not verify the backend. See [provenance and limitations](docs/model-provenance.md).
 - **Cost estimation with a user-maintained model price book** — per-model rates, per-model peak/off-peak schedules, **each message/step priced by its requested model** (input, cache-hit, cache-write and output priced separately at that step's own time), and a «Usage & cost» dialog with a stacked cost-trend chart (day / week / month), a paged per-step usage history (with request/response model columns and a dedicated cache-hit column), and a total-cost hero
 - **Keeps up with DeepSeek's shifting peak/off-peak rules** — no more one hard-coded list of `HH:MM` windows: billing keys off **working day vs weekend vs public holiday**, with the holiday / 调休 calendar fetched and cached locally (and editable by hand). When DeepSeek moves the windows, changes the weekend rule, or adds holidays and make-up workdays, you refresh once or edit one field instead of rebuilding the price book
-- **Zero-config default** — 13 segments ship enabled; everything else is a checkbox away
+- **Zero-config default** — 14 segments ship enabled; everything else is a checkbox away
 - **Useful options** — multi-line wrapping (so nothing gets truncated), per-model cost estimation with peak/off-peak pricing, currency choice (CNY / USD), a quick-toggle gear menu, and a dedicated settings page with one-click reset
 - **Official context ring, built in** — the composer's context meter is recreated inside the bar: a right-pinned ring and percentage fed by `contextPressure`, with the shipped click-open `contextBreakdown` panel (system prompt / tools / conversation). Turn the context segment off to hand the ring back to DSH
 - **24-hour clock fields** — peak windows are typed as `09:00`, not whatever AM/PM format the browser locale would impose on a native time input
@@ -47,7 +47,7 @@ The status bar replaces the built-in stats line with near-native live session te
 
 | Item | Value |
 |---|---|
-| **DSH target** | **`0.2.1-rc.3` — source audit, full build and 19 regression tests passed on 2026-10-27; desktop/provider integration pending** |
+| **DSH target** | **`0.2.1-rc.3` — source audit, full build and 37 regression tests passed on 2026-10-27; desktop/provider integration pending** |
 | Build dependencies | Existing `0.2.0-rc.2` devDependencies and lockfile retained. A temporary copy also builds and passes the same tests with all 18 direct DSH packages at `0.2.1-rc.3`. |
 | **Plugin line** | **`0.2.x` for the desktop runtime. `0.1.x` targets the retired `0.1.x` runtime and will not load on the 0.2.x desktop.** |
 | DSH profile | `desktop` for the packaged app · `web` for a self-hosted `dsh web` · `headless` for the CLI runtime |
@@ -56,10 +56,22 @@ The status bar replaces the built-in stats line with near-native live session te
 
 ### Model identity semantics
 
-The model segment shows `Requested A · Response (SDK-reported) B`. The usage
+The two model segments show `Requested A | Response (SDK-reported) B`. The usage
 history preserves both fields for each step. If the next step reports C and the
 one after it supplies no response metadata, the bar becomes A/C then A/unknown.
 Pricing and chart aggregation continue to use A.
+
+**Independent display controls:** Requested model and Response model
+(SDK-reported) each have a checkbox in Settings → Status Bar and the quick
+menu. Use the existing ↑/↓ controls to order them independently. Both, either
+one, or neither can be shown; new installs enable both. These switches affect
+only the bar, not history, provider metadata or pricing.
+
+Saved settings migrate to schema version 4 using the same storage key. An
+enabled legacy `model` becomes `requestedModel`, then `responseModel`, at its
+original position. If it was disabled, both stay disabled. Other segments keep
+their order, and an empty list stays empty after reload. The master/native-bar
+switches, price book and calendar settings are preserved.
 
 DSH rc.3 locks pi-ai 1.1.0. Its Anthropic and OpenAI Chat Completions paths only
 retain a response model when it differs from the request; its OpenAI Responses
@@ -187,14 +199,14 @@ All configuration is client-side, stored in browser `localStorage` under **`dsh.
 |---|---|---|
 | `enabled` | `true` | Master switch; `false` hides the bar entirely |
 | `wrap` | `true` | Allow the bar to wrap onto multiple lines within the input card's width instead of eliding (the bar never runs past the input box's edges in either mode) |
-| `segments` | 13 on / 3 off (see below) | Ordered list of enabled segments |
+| `segments` | 14 on / 3 off (see below) | Ordered list of enabled segments |
 | `cost.currency` | `CNY` | Currency for cost display (`CNY` / `USD`) |
 | `cost.models` | `{}` | User-maintained model price book (model id → prices + schedule) |
 | `calendar.dayRules` | `true` | Split peak/off-peak by working day vs weekend/holiday; off = clock windows only (the old behavior) |
 | `calendar.autoFetch` | `true` | Fetch and cache the holiday calendar through the plugin host route |
 | `calendar.overrides` | `[]` | Manual exception dates (`{date, kind: off/work/auto, label}`); they win over the published calendar |
 
-**Default segment state:** on — status, model, counts, durations, speeds, cache hit, tokens, context, TPS, session time, jobs, queue, errors; off — title, workspace, cost.
+**Default segment state:** on — status, requested model, response model, counts, durations, speeds, cache hit, tokens, context, TPS, session time, jobs, queue, errors; off — title, workspace, cost.
 
 **Model price book entry** (defaults filled in when a model is added — DeepSeek's current published rates per 1M tokens): peak input `2` / cache hit `0.04` / output `8`, off-peak input `1` / cache hit `0.02` / output `4`, cache write `0`; peak/off-peak is on by default with timezone `Asia/Shanghai` (DeepSeek writes its schedule in Beijing time), peak windows `09:00–12:00` and `14:00–18:00` on working days, and weekends plus public holidays / 调休 rest days off-peak all day. Existing entries are never overwritten, but a v1 config is upgraded field by field: its windows keep their old all-days behavior and the weekend/holiday switches default to on — turn `Split peak/off-peak by working day vs holiday` off to keep the literal old behavior.
 
@@ -202,12 +214,13 @@ All configuration is client-side, stored in browser `localStorage` under **`dsh.
 
 **Environment variables:** `DSH_HOME` (host-side) — base directory for the plugin's local data (default `~/.dsh`). No other env vars, no secrets, no tokens.
 
-**Segment reference** (all 16 toggleable; the context ring is pinned right, the rest reorderable):
+**Segment reference** (all 17 toggleable; the context ring is pinned right, the rest reorderable):
 
 | Segment | Shows | Source |
 |---|---|---|
 | Status | ● running / idle / error dot | session snapshot `running` / `lastAgentError` + chat `partial` / `runningCalls` |
-| Requested / response model | latest recorded message's request and SDK report (`unknown` if missing) | `sessionModel` projection; both fields read from the same assistant/message source |
+| Requested model | latest recorded message's request identity | `sessionModel.requestedModel`; also the price-book key |
+| Response model (SDK-reported) | the same message's SDK report (`unknown` if missing) | `sessionModel.responseModel`; no request fallback |
 | Title | session title (truncated) | `SessionSummary.displayTitle` |
 | Workspace | workspace dir name | `SessionSummary.cwd` |
 | Turns & steps | N turns · M steps | `sessionStats` projection (window-fold fallback) |

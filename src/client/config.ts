@@ -26,13 +26,14 @@ export type {
 } from './pricing-types.ts'
 
 export const STORAGE_KEY = 'dsh.statusBar.v1'
-/** Current persisted schema version; v2 added day-type pricing, v3 the native-bar switch. */
-export const CONFIG_VERSION = 3
+/** v2: day-type pricing; v3: native-bar switch; v4: independent model segments. */
+export const CONFIG_VERSION = 4
 
 /** Every segment the bar can render, in stable registry order. */
 export const SEGMENT_IDS = [
   'status',
-  'model',
+  'requestedModel',
+  'responseModel',
   'title',
   'workspace',
   'counts',
@@ -66,7 +67,8 @@ export interface SegmentMeta {
 /** Segment display metadata; the manager page renders one row per segment. */
 export const SEGMENT_META: Record<SegmentId, SegmentMeta> = {
   status: { label: 'seg.status', hint: 'seg.statusHint', defaultOn: true },
-  model: { label: 'seg.model', hint: 'seg.modelHint', defaultOn: true },
+  requestedModel: { label: 'seg.requestedModel', hint: 'seg.requestedModelHint', defaultOn: true },
+  responseModel: { label: 'seg.responseModel', hint: 'seg.responseModelHint', defaultOn: true },
   title: { label: 'seg.title', hint: 'seg.titleHint', defaultOn: false },
   workspace: { label: 'seg.workspace', hint: 'seg.workspaceHint', defaultOn: false },
   counts: { label: 'seg.counts', hint: 'seg.countsHint', defaultOn: true },
@@ -273,15 +275,26 @@ function migrateCost(raw: Partial<StatusBarConfig> | undefined): CostPrices {
   return { currency, models }
 }
 
+/** Expand an enabled legacy model in place; an absent one stays disabled. */
+function loadSegments(raw: unknown, version: unknown): SegmentId[] {
+  if (!Array.isArray(raw)) return [...DEFAULT_CONFIG.segments]
+  // Explicit new IDs win in mixed/partially migrated settings, so a stale
+  // legacy ID cannot re-enable a model segment the user has hidden.
+  const splitLegacy = (typeof version !== 'number' || version < 4)
+    && !raw.includes('requestedModel') && !raw.includes('responseModel')
+  const expanded = raw.flatMap(id => id === 'model' && splitLegacy
+    ? ['requestedModel', 'responseModel'] : [id])
+  // Keep the order of all other enabled segments. In particular, [] is a
+  // deliberate all-off configuration, not a reason to restore defaults.
+  return [...new Set(expanded.filter((id): id is SegmentId => SEGMENT_IDS.includes(id as SegmentId)))]
+}
+
 function load(): StatusBarConfig {
   const raw = readStorage()
   if (raw === null) return DEFAULT_CONFIG
   try {
     const parsed = JSON.parse(raw) as Partial<StatusBarConfig> & Record<string, unknown>
-    const segments = Array.isArray(parsed.segments)
-      ? parsed.segments.filter((id): id is SegmentId =>
-        SEGMENT_IDS.includes(id as SegmentId))
-      : DEFAULT_CONFIG.segments
+    const segments = loadSegments(parsed.segments, parsed.version)
     const cost = parsed.cost !== undefined && typeof parsed.cost === 'object'
       && 'models' in parsed.cost
       ? { currency: parsed.cost.currency === 'USD' ? 'USD' as const : 'CNY' as const, models: parsed.cost.models }
@@ -305,7 +318,7 @@ function load(): StatusBarConfig {
       native: parsed.native === true,
       enabled: parsed.enabled !== false,
       wrap: parsed.wrap === true,
-      segments: segments.length > 0 ? segments : DEFAULT_CONFIG.segments,
+      segments,
       cost: { currency: cost.currency, models },
       calendar,
     }

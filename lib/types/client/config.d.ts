@@ -9,10 +9,10 @@ import type { NS } from './locales.ts';
 import type { HolidayOverride, ModelConfig, PeakHourWindow } from './pricing-types.ts';
 export type { DayType, HolidayCalendar, HolidayOverride, ModelConfig, OverrideKind, PeakHourWindow, } from './pricing-types.ts';
 export declare const STORAGE_KEY = "dsh.statusBar.v1";
-/** Current persisted schema version; v2 added day-type pricing, v3 the native-bar switch. */
-export declare const CONFIG_VERSION = 3;
+/** v2: day-type pricing; v3: native-bar switch; v4: independent model segments. */
+export declare const CONFIG_VERSION = 4;
 /** Every segment the bar can render, in stable registry order. */
-export declare const SEGMENT_IDS: readonly ["status", "model", "title", "workspace", "counts", "durations", "speeds", "cacheHit", "tokens", "context", "tps", "sessionTime", "cost", "jobs", "queue", "errors"];
+export declare const SEGMENT_IDS: readonly ["status", "requestedModel", "responseModel", "title", "workspace", "counts", "durations", "speeds", "cacheHit", "tokens", "context", "tps", "sessionTime", "cost", "jobs", "queue", "errors"];
 export type SegmentId = (typeof SEGMENT_IDS)[number];
 /** Dictionary key type of this plugin's locale namespace. */
 export type StatusBarKey = LocaleKeysOf<typeof NS>;

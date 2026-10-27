@@ -16,16 +16,41 @@ const cost = {
 const pricing = { dayRules: false, overrides: [] }
 const translate = dictionary => (key, params = {}) => dictionary[key].replace(/\{(\w+)\}/g, (_, name) => params[name])
 
-test('bar separates fields and explicitly renders unknown in both locales', () => {
-  const config = { ...DEFAULT_CONFIG, segments: ['model'] }
-  for (const dictionary of [zh, en]) {
-    for (const responseModel of ['B', 'C', null]) {
-      const source = { chat: { nodes: [] }, sessionModel: { provider: 'p', requestedModel: 'A', responseModel } }
-      assert.deepEqual(buildSegments(source, config, translate(dictionary)), [{
-        id: 'model', text: translate(dictionary)('bar.model', { requested: 'A', response: responseModel ?? 'unknown' }),
-      }])
+for (const [label, modelSegments] of [
+  ['both', ['requestedModel', 'responseModel']],
+  ['request only', ['requestedModel']],
+  ['response only', ['responseModel']],
+  ['neither', []],
+]) {
+  test(`model visibility: ${label}; preserve unknown, provider and requested-model pricing`, () => {
+    const config = { ...DEFAULT_CONFIG, cost, segments: [...modelSegments, 'cost'] }
+    for (const dictionary of [zh, en]) {
+      for (const responseModel of ['B', 'C', null]) {
+        const identity = Object.freeze({ provider: 'test-provider', requestedModel: 'A', responseModel })
+        const source = {
+          chat: { nodes: [] }, sessionModel: identity,
+          sessionUsage: usage.apply(usage.init(), message(1, responseModel)), now: time,
+        }
+        const t = translate(dictionary)
+        const expected = []
+        if (modelSegments.includes('requestedModel')) expected.push({ id: 'requestedModel', text: t('bar.requestedModel', { model: 'A' }) })
+        if (modelSegments.includes('responseModel')) expected.push({ id: 'responseModel', text: t('bar.responseModel', { model: responseModel ?? 'unknown' }) })
+        expected.push({ id: 'cost', text: '≈$0.0001' })
+        assert.deepEqual(buildSegments(source, config, t), expected)
+        assert.deepEqual(source.sessionModel, { provider: 'test-provider', requestedModel: 'A', responseModel })
+      }
     }
-  }
+  })
+}
+
+test('model segments respect independent ordering among other visible segments', () => {
+  const config = { ...DEFAULT_CONFIG, segments: ['responseModel', 'queue', 'requestedModel'] }
+  const source = { chat: { nodes: [] }, queueLength: 2, sessionModel: { provider: 'p', requestedModel: 'A', responseModel: 'B' } }
+  assert.deepEqual(buildSegments(source, config, translate(en)), [
+    { id: 'responseModel', text: 'Response (SDK-reported) B' },
+    { id: 'queue', text: 'Queue 2' },
+    { id: 'requestedModel', text: 'Requested A' },
+  ])
 })
 
 test('window fallback stops at the latest assistant and never borrows older metadata', () => {

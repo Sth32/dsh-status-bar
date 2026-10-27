@@ -135,8 +135,10 @@ const zh = {
   'usage.page': '第 {current} / {total} 页',
   'seg.status': '会话状态',
   'seg.statusHint': '运行中 / 空闲 / 出错 状态点与文字。',
-  'seg.model': '请求 / 响应模型',
-  'seg.modelHint': '最近一条已记录消息的请求模型与 SDK 报告模型；缺失显示 unknown，不证明后端身份。',
+  'seg.requestedModel': '请求模型',
+  'seg.requestedModelHint': '最近一条已记录消息的请求模型，也是费用估算使用的价目表标识。',
+  'seg.responseModel': '响应模型（SDK 报告）',
+  'seg.responseModelHint': '同一条已记录消息的 SDK 报告模型；缺失显示 unknown，不证明后端身份。',
   'seg.title': '会话标题',
   'seg.titleHint': '当前会话的标题或项目名。',
   'seg.workspace': '工作区',
@@ -170,7 +172,8 @@ const zh = {
   'bar.status.running': '运行中',
   'bar.status.idle': '空闲',
   'bar.status.error': '出错',
-  'bar.model': '请求 {requested} · 响应（SDK 报告）{response}',
+  'bar.requestedModel': '请求 {model}',
+  'bar.responseModel': '响应（SDK 报告）{model}',
   'bar.counts': '{turns} 轮 · {steps} 步',
   'bar.llm': 'LLM {duration}',
   'bar.toolCall': '工具调用 {duration}',
@@ -193,7 +196,7 @@ const zh = {
   'quick.master': '启用插件底栏',
   'quick.native': '使用原生底栏',
   'quick.reset': '恢复默认',
-  'preview.line': '2 轮 · 51 步 | 请求 deepseek-flash · 响应（SDK 报告）unknown | 缓存命中 98% | TPS 123 tok/s',
+  'preview.line': '2 轮 · 51 步 | 请求 deepseek-flash | 响应（SDK 报告）unknown | 缓存命中 98% | TPS 123 tok/s',
 }
 
 const en: Record<keyof typeof zh, string> = {
@@ -326,8 +329,10 @@ const en: Record<keyof typeof zh, string> = {
 
   'seg.status': 'Session status',
   'seg.statusHint': 'Running / idle / error dot and label.',
-  'seg.model': 'Requested / response model',
-  'seg.modelHint': 'The latest recorded message\'s request and SDK report; missing reports are unknown, and reports do not verify backend identity.',
+  'seg.requestedModel': 'Requested model',
+  'seg.requestedModelHint': 'The latest recorded message\'s request identity, also used to select price-book rates.',
+  'seg.responseModel': 'Response model (SDK-reported)',
+  'seg.responseModelHint': 'The same recorded message\'s SDK report; missing reports are unknown, and reports do not verify backend identity.',
   'seg.title': 'Session title',
   'seg.titleHint': 'Title or project name of the current session.',
   'seg.workspace': 'Workspace',
@@ -361,7 +366,8 @@ const en: Record<keyof typeof zh, string> = {
   'bar.status.running': 'Running',
   'bar.status.idle': 'Idle',
   'bar.status.error': 'Error',
-  'bar.model': 'Requested {requested} · Response (SDK-reported) {response}',
+  'bar.requestedModel': 'Requested {model}',
+  'bar.responseModel': 'Response (SDK-reported) {model}',
   'bar.counts': '{turns} turns · {steps} steps',
   'bar.llm': 'LLM {duration}',
   'bar.toolCall': 'Tool call {duration}',
@@ -384,7 +390,7 @@ const en: Record<keyof typeof zh, string> = {
   'quick.master': 'Enable plugin bar',
   'quick.native': 'Use native status bar',
   'quick.reset': 'Reset to defaults',
-  'preview.line': '2 turns · 51 steps | Requested deepseek-flash · Response (SDK-reported) unknown | Cache hit 98% | TPS 123 tok/s',
+  'preview.line': '2 turns · 51 steps | Requested deepseek-flash | Response (SDK-reported) unknown | Cache hit 98% | TPS 123 tok/s',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

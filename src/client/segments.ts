@@ -331,14 +331,14 @@ function segmentView(
           : t('bar.status.idle')
       return { id, state, text }
     }
-    case 'model': {
+    case 'requestedModel':
+    case 'responseModel': {
       const identity = lastModel(chat, source.sessionModel)
       return identity === null ? null : {
         id,
-        text: t('bar.model', {
-          requested: identity.requestedModel,
-          response: identity.responseModel ?? 'unknown',
-        }),
+        text: id === 'requestedModel'
+          ? t('bar.requestedModel', { model: identity.requestedModel })
+          : t('bar.responseModel', { model: identity.responseModel ?? 'unknown' }),
       }
     }
     case 'title': {
