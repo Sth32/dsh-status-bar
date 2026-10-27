@@ -78,8 +78,8 @@ function HistoryTable({ rows, currency, t }: {
                     minute: '2-digit',
                   })}
                 </td>
-                <td className="model" title={row.requestedModel ?? 'unknown'}>{row.requestedModel ?? 'unknown'}</td>
-                <td className="model" title={row.responseModel ?? 'unknown'}>{row.responseModel ?? 'unknown'}</td>
+                <td className="model" title={row.requestedModel ?? t('model.unknown')}>{row.requestedModel ?? t('model.unknown')}</td>
+                <td className="model" title={row.responseModel ?? t('model.unknown')}>{row.responseModel ?? t('model.unknown')}</td>
                 <td className="num">{formatTokens(row.input)}</td>
                 <td className="num">
                   {formatTokens(row.cacheRead)}
@@ -258,7 +258,7 @@ export const UsageDialogEntry = memo(function UsageDialogEntry(props: UsageDialo
           {modelConfig !== undefined && (
             <div className="dsb-usage-prices">
               <span className="dsb-usage-prices-title">
-                {t('usage.prices', { model: sessionModel?.requestedModel ?? 'unknown' })}
+                {t('usage.prices', { model: sessionModel?.requestedModel ?? t('model.unknown') })}
               </span>
               {prices !== null && (
                 <>

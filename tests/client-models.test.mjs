@@ -25,16 +25,17 @@ for (const [label, modelSegments] of [
   test(`model visibility: ${label}; preserve unknown, provider and requested-model pricing`, () => {
     const config = { ...DEFAULT_CONFIG, cost, segments: [...modelSegments, 'cost'] }
     for (const dictionary of [zh, en]) {
-      for (const responseModel of ['B', 'C', null]) {
+      for (const responseModel of ['B', 'C', 'unknown', null]) {
         const identity = Object.freeze({ provider: 'test-provider', requestedModel: 'A', responseModel })
         const source = {
           chat: { nodes: [] }, sessionModel: identity,
           sessionUsage: usage.apply(usage.init(), message(1, responseModel)), now: time,
         }
         const t = translate(dictionary)
+        const description = t('bar.modelDetails', { provider: identity.provider, requested: 'A', response: responseModel ?? t('model.unknown') })
         const expected = []
-        if (modelSegments.includes('requestedModel')) expected.push({ id: 'requestedModel', text: t('bar.requestedModel', { model: 'A' }) })
-        if (modelSegments.includes('responseModel')) expected.push({ id: 'responseModel', text: t('bar.responseModel', { model: responseModel ?? 'unknown' }) })
+        if (modelSegments.includes('requestedModel')) expected.push({ id: 'requestedModel', text: t('bar.requestedModel', { model: 'A' }), description })
+        if (modelSegments.includes('responseModel')) expected.push({ id: 'responseModel', text: t('bar.responseModel', { model: responseModel ?? t('model.unknown') }), description })
         expected.push({ id: 'cost', text: '≈$0.0001' })
         assert.deepEqual(buildSegments(source, config, t), expected)
         assert.deepEqual(source.sessionModel, { provider: 'test-provider', requestedModel: 'A', responseModel })
@@ -46,12 +47,36 @@ for (const [label, modelSegments] of [
 test('model segments respect independent ordering among other visible segments', () => {
   const config = { ...DEFAULT_CONFIG, segments: ['responseModel', 'queue', 'requestedModel'] }
   const source = { chat: { nodes: [] }, queueLength: 2, sessionModel: { provider: 'p', requestedModel: 'A', responseModel: 'B' } }
+  const description = translate(en)('bar.modelDetails', { provider: 'p', requested: 'A', response: 'B' })
   assert.deepEqual(buildSegments(source, config, translate(en)), [
-    { id: 'responseModel', text: 'Response (SDK-reported) B' },
+    { id: 'responseModel', text: 'Resp:B', description },
     { id: 'queue', text: 'Queue 2' },
-    { id: 'requestedModel', text: 'Requested A' },
+    { id: 'requestedModel', text: 'Req:A', description },
   ])
 })
+
+for (const [language, dictionary, labels, disclaimer] of [
+  ['zh', zh, ['请求:A', '响应:未知'], ['SDK 报告不验证实际后端', '缺失不能用请求模型回填']],
+  ['en', en, ['Req:A', 'Resp:unknown'], ['does not verify the actual backend', 'must never be filled from the requested model']],
+]) {
+  test(`${language}: compact labels localize missing values and keep complete provenance in descriptions`, () => {
+    const config = { ...DEFAULT_CONFIG, segments: ['requestedModel', 'responseModel'] }
+    const identity = { provider: 'provider.example/full-route', requestedModel: 'A', responseModel: null }
+    const source = { chat: { nodes: [] }, sessionModel: identity }
+    const views = buildSegments(source, config, translate(dictionary))
+    assert.deepEqual(views.map(view => view.text), labels)
+    for (const view of views) {
+      assert.ok(!view.text.includes('SDK'))
+      assert.ok(view.description.includes(identity.provider))
+      assert.ok(view.description.includes('A'))
+      for (const phrase of disclaimer) assert.ok(view.description.includes(phrase))
+    }
+    const fullReport = 'provider-model-with-an-unabridged-version-suffix-1234567890'
+    identity.responseModel = fullReport
+    assert.ok(buildSegments(source, config, translate(dictionary))[1].description.includes(fullReport))
+    assert.equal(source.sessionModel.responseModel, fullReport)
+  })
+}
 
 test('window fallback stops at the latest assistant and never borrows older metadata', () => {
   const first = assistantNode(message(1, 'B'))

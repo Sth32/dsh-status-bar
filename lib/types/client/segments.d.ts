@@ -23,6 +23,8 @@ export interface SegmentView {
     /** Status segment only: drives the leading state dot. */
     state?: StatusState;
     text: string;
+    /** Full provenance for hover and keyboard/screen-reader descriptions. */
+    description?: string;
 }
 export interface SegmentSource {
     /** Settled-message slice of the Chat view: nodes, turn timings, partial, running calls. */

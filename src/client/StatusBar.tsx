@@ -23,7 +23,8 @@ import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-cli
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useStatusBarConfig } from './config.ts'
 import { noteCurrentModel } from './live-model.ts'
-import { buildSegments, deriveWindowStats, type SegmentView } from './segments.ts'
+import { buildSegments, deriveWindowStats } from './segments.ts'
+import { Segment } from './Segment.tsx'
 import { ContextRing } from './ContextRing.tsx'
 import { NS } from './locales.ts'
 import { modelIdentityFromProjection } from '../model-identity.ts'
@@ -51,23 +52,6 @@ export interface StatusBarInjected {
 /** Full props for the composer-dock entry (owner InputZone + standard kit + locale + jobs face). */
 export type StatusBarDockEntryProps =
   PropsRuntime<'conversation.composer.dock'> & PropsLocale<typeof NS> & InjectFace<StatusBarInjected>
-
-const STATUS_DOT: Record<'running' | 'idle' | 'error', string> = {
-  running: '#e8b339',
-  idle: '#5b8def',
-  error: '#e5484d',
-}
-
-/** Compact dot for the status segment (kept dependency-light). */
-function StatusDot({ state }: { state: 'running' | 'idle' | 'error' }) {
-  return (
-    <span
-      className="dsb-dot"
-      style={{ backgroundColor: STATUS_DOT[state] }}
-      aria-hidden
-    />
-  )
-}
 
 /**
  * Trailing-edge throttle for the live TPS figure. The client-side live-rate
@@ -107,16 +91,6 @@ function useThrottled<T>(value: T, intervalMs: number): T {
   }, [])
 
   return display
-}
-
-/** One segment: optional state dot + text (the row owns separators). */
-function Segment({ view }: { view: SegmentView }) {
-  return (
-    <span className="dsb-seg">
-      {view.state !== undefined && <StatusDot state={view.state} />}
-      {view.text}
-    </span>
-  )
 }
 
 export const StatusBarDockEntry = memo(function StatusBarDockEntry(props: StatusBarDockEntryProps) {
@@ -178,6 +152,7 @@ export const StatusBarDockEntry = memo(function StatusBarDockEntry(props: Status
     ? buildSegments({ chat, session, queueLength, stats, usage, liveRate, sessionModel, sessionUsage, jobs, summary, now }, config, t)
     : []).filter(view => view.id !== 'context')
   const line = views.map(view => view.text).join(' | ')
+  const fullLine = views.map(view => view.description ?? view.text).join('\n')
   // The context segment is pinned to the right as the shipped-style ring.
   // While it renders, the CSS rule hides the native ContextMeter; turning the
   // segment off removes the ring and lets the native meter return.
@@ -229,7 +204,7 @@ export const StatusBarDockEntry = memo(function StatusBarDockEntry(props: Status
       data-dsb-context={hasRing ? 'true' : undefined}
     >
       {views.length > 0 && (
-        <Tooltip label={line} side="top" delayMs={500} disabled={!truncated}>
+        <Tooltip label={fullLine} side="top" delayMs={500} disabled={!truncated}>
           <div ref={lineRef} className="dsb-line">
             {views.map((view, i) => (
               <Fragment key={view.id}>

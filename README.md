@@ -56,13 +56,17 @@ The status bar replaces the built-in stats line with near-native live session te
 
 ### Model identity semantics
 
-The two model segments show `Requested A | Response (SDK-reported) B`. The usage
-history preserves both fields for each step. If the next step reports C and the
+The two model segments show `Req:A | Resp:B`. A missing response shows
+`Resp:unknown` (`响应:未知` in Chinese). Hover over either segment for the complete
+provider/model pair, source and limitations; the same description is associated
+with the keyboard-focusable segment for screen readers. SDK reports do not verify
+the actual backend, and a missing report must never be filled from the request.
+The usage history preserves both fields for each step. If the next step reports C and the
 one after it supplies no response metadata, the bar becomes A/C then A/unknown.
 Pricing and chart aggregation continue to use A.
 
 **Independent display controls:** Requested model and Response model
-(SDK-reported) each have a checkbox in Settings → Status Bar and the quick
+each have a checkbox in Settings → Status Bar and the quick
 menu. Use the existing ↑/↓ controls to order them independently. Both, either
 one, or neither can be shown; new installs enable both. These switches affect
 only the bar, not history, provider metadata or pricing.
@@ -79,7 +83,10 @@ path does not retain this field. Thus `unknown` can also mean that the SDK omitt
 an equal model. Native DeepSeek and legacy records without this metadata also
 show `unknown`. The plugin cannot infer the missing value. No global network hook
 or DSH core modification is used. See the [pinned source audit, ledger migration
-and local integration checklist](docs/model-provenance.md).
+and local integration checklist](docs/model-provenance.md). The compact-label
+update does **not** fix the OpenAI Responses acquisition gap. The audit includes
+a proposed adapter fix using the SDK's existing per-request stream-event observer;
+that fix requires separate approval and has not been implemented.
 
 ### What the desktop port changed (0.2.0)
 

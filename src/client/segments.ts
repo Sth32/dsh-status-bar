@@ -40,6 +40,8 @@ export interface SegmentView {
   /** Status segment only: drives the leading state dot. */
   state?: StatusState
   text: string
+  /** Full provenance for hover and keyboard/screen-reader descriptions. */
+  description?: string
 }
 
 export interface SegmentSource {
@@ -338,7 +340,12 @@ function segmentView(
         id,
         text: id === 'requestedModel'
           ? t('bar.requestedModel', { model: identity.requestedModel })
-          : t('bar.responseModel', { model: identity.responseModel ?? 'unknown' }),
+          : t('bar.responseModel', { model: identity.responseModel ?? t('model.unknown') }),
+        description: t('bar.modelDetails', {
+          provider: identity.provider,
+          requested: identity.requestedModel,
+          response: identity.responseModel ?? t('model.unknown'),
+        }),
       }
     }
     case 'title': {

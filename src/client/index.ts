@@ -248,6 +248,22 @@ const STYLES = `
   display: inline-block;
   max-width: 100%;
 }
+.dsb-seg:focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.dsb-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 .dsb-quick {
   display: inline-flex;
   align-items: center;

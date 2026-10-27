@@ -170,8 +170,10 @@ declare const zh: {
     'bar.status.running': string;
     'bar.status.idle': string;
     'bar.status.error': string;
+    'model.unknown': string;
     'bar.requestedModel': string;
     'bar.responseModel': string;
+    'bar.modelDetails': string;
     'bar.counts': string;
     'bar.llm': string;
     'bar.toolCall': string;
